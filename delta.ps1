@@ -190,17 +190,13 @@ if (Test-Path $dllPath) {
 
 # === Process Selection Menu (Interactive) ===
 Clear-Host
-Write-Host "╔════════════════════════════════════════════════╗" -ForegroundColor Cyan
-Write-Host "║         DELTA DLL INJECTION TOOL               ║" -ForegroundColor Yellow
-Write-Host "╚════════════════════════════════════════════════╝" -ForegroundColor Cyan
+Write-Host "NOVA STORE DELTA" -ForegroundColor Yellow
 Write-Host ""
-Write-Host "  Select target process for injection:" -ForegroundColor White
+Write-Host "Select target process for injection:" -ForegroundColor White
 Write-Host ""
-Write-Host "    [1] Notepad" -ForegroundColor Green
-Write-Host "    [2] Task Manager (Taskmgr)" -ForegroundColor Green
-Write-Host "    [3] RuntimeBroker" -ForegroundColor Green
-Write-Host ""
-Write-Host "╔════════════════════════════════════════════════╗" -ForegroundColor Cyan
+Write-Host "  [1] Notepad" -ForegroundColor Green
+Write-Host "  [2] Task Manager (Taskmgr)" -ForegroundColor Green
+Write-Host "  [3] RuntimeBroker" -ForegroundColor Green
 Write-Host ""
 
 $proc = $null
@@ -209,8 +205,7 @@ $targetExe = ""
 $validChoice = $false
 
 do {
-    Write-Host ""
-    $choice = Read-Host "  Enter choice (1-3)"
+    $choice = Read-Host "Enter choice (1-3)"
     Write-Host ""
     
     switch ($choice) {
@@ -221,10 +216,10 @@ do {
             try {
                 $existingProc = Get-Process -Name "notepad" -ErrorAction SilentlyContinue | Select-Object -First 1
                 if ($existingProc) {
-                    Write-Host "  [+] Found existing Notepad.exe (PID: $($existingProc.Id))" -ForegroundColor Green
+                    Write-Host "[+] Found existing Notepad.exe (PID: $($existingProc.Id))" -ForegroundColor Green
                     $proc = $existingProc
                 } else {
-                    Write-Host "  [+] Starting Notepad.exe..." -ForegroundColor Cyan
+                    Write-Host "[+] Starting Notepad.exe..." -ForegroundColor Cyan
                     $proc = Start-Process -FilePath "notepad.exe" -WindowStyle Normal -PassThru -ErrorAction Stop
                     Start-Sleep -Seconds 2
                     $proc = Get-Process -Id $proc.Id -ErrorAction SilentlyContinue
@@ -232,7 +227,7 @@ do {
                 $validChoice = $true
             }
             catch {
-                Write-Host "  [!] Failed to start Notepad.exe: $($_.Exception.Message)" -ForegroundColor Red
+                Write-Host "[!] Failed to start Notepad.exe: $($_.Exception.Message)" -ForegroundColor Red
             }
         }
         "2" {
@@ -242,10 +237,10 @@ do {
             try {
                 $existingProc = Get-Process -Name "taskmgr" -ErrorAction SilentlyContinue | Select-Object -First 1
                 if ($existingProc) {
-                    Write-Host "  [+] Found existing Task Manager (PID: $($existingProc.Id))" -ForegroundColor Green
+                    Write-Host "[+] Found existing Task Manager (PID: $($existingProc.Id))" -ForegroundColor Green
                     $proc = $existingProc
                 } else {
-                    Write-Host "  [+] Starting Task Manager..." -ForegroundColor Cyan
+                    Write-Host "[+] Starting Task Manager..." -ForegroundColor Cyan
                     $proc = Start-Process -FilePath "taskmgr.exe" -WindowStyle Normal -PassThru -ErrorAction Stop
                     Start-Sleep -Seconds 3
                     $proc = Get-Process -Id $proc.Id -ErrorAction SilentlyContinue
@@ -253,7 +248,7 @@ do {
                 $validChoice = $true
             }
             catch {
-                Write-Host "  [!] Failed to start Task Manager: $($_.Exception.Message)" -ForegroundColor Red
+                Write-Host "[!] Failed to start Task Manager: $($_.Exception.Message)" -ForegroundColor Red
             }
         }
         "3" {
@@ -263,10 +258,10 @@ do {
             try {
                 $proc = Get-Process -Name "RuntimeBroker" -ErrorAction SilentlyContinue | Select-Object -First 1
                 if ($proc) {
-                    Write-Host "  [+] Found RuntimeBroker.exe (PID: $($proc.Id))" -ForegroundColor Green
+                    Write-Host "[+] Found RuntimeBroker.exe (PID: $($proc.Id))" -ForegroundColor Green
                     $validChoice = $true
                 } else {
-                    Write-Host "  [!] RuntimeBroker not found. Using Notepad as fallback..." -ForegroundColor Yellow
+                    Write-Host "[!] RuntimeBroker not found. Using Notepad as fallback..." -ForegroundColor Yellow
                     $targetProcess = "notepad"
                     $targetExe = "notepad.exe"
                     $proc = Start-Process -FilePath "notepad.exe" -WindowStyle Normal -PassThru -ErrorAction Stop
@@ -276,37 +271,33 @@ do {
                 }
             }
             catch {
-                Write-Host "  [!] Failed to find RuntimeBroker: $($_.Exception.Message)" -ForegroundColor Red
+                Write-Host "[!] Failed to find RuntimeBroker: $($_.Exception.Message)" -ForegroundColor Red
             }
         }
         default {
-            Write-Host "  [!] Invalid choice. Please enter 1, 2, or 3." -ForegroundColor Red
+            Write-Host "[!] Invalid choice. Please enter 1, 2, or 3." -ForegroundColor Red
         }
     }
     
     if (-not $validChoice) {
-        Write-Host "  [!] Failed to get a valid process." -ForegroundColor Red
-        Write-Host "  Press any key to try again..." -ForegroundColor Yellow
+        Write-Host "[!] Failed to get a valid process." -ForegroundColor Red
+        Write-Host "Press any key to try again..." -ForegroundColor Yellow
         Read-Host
         Clear-Host
-        Write-Host "╔══════════════════════════════════════════════╗" -ForegroundColor Cyan
-        Write-Host "║         DELTA DLL INJECTION TOOL             ║" -ForegroundColor Yellow
-        Write-Host "╚══════════════════════════════════════════════╝" -ForegroundColor Cyan
+        Write-Host "NOVA STORE DELTA" -ForegroundColor Yellow
         Write-Host ""
-        Write-Host "  Select target process for injection:" -ForegroundColor White
+        Write-Host "Select target process for injection:" -ForegroundColor White
         Write-Host ""
-        Write-Host "    [1] Notepad" -ForegroundColor Green
-        Write-Host "    [2] Task Manager (Taskmgr)" -ForegroundColor Green
-        Write-Host "    [3] RuntimeBroker" -ForegroundColor Green
-        Write-Host ""
-        Write-Host "╔══════════════════════════════════════════════╗" -ForegroundColor Cyan
+        Write-Host "  [1] Notepad" -ForegroundColor Green
+        Write-Host "  [2] Task Manager (Taskmgr)" -ForegroundColor Green
+        Write-Host "  [3] RuntimeBroker" -ForegroundColor Green
         Write-Host ""
     }
 } while (-not $validChoice -or -not $proc)
 
 # ตรวจสอบ process
 if (-not $proc) {
-    Write-Host "  [!] No target process available. Exiting..." -ForegroundColor Red
+    Write-Host "[!] No target process available. Exiting..." -ForegroundColor Red
     Read-Host "Press Enter to exit"
     exit 1
 }
@@ -314,17 +305,15 @@ if (-not $proc) {
 try {
     $proc = Get-Process -Id $proc.Id -ErrorAction Stop
 } catch {
-    Write-Host "  [!] Process died or is no longer accessible. Exiting..." -ForegroundColor Red
+    Write-Host "[!] Process died or is no longer accessible. Exiting..." -ForegroundColor Red
     Read-Host "Press Enter to exit"
     exit 1
 }
 
 $pid1 = $proc.Id
 Write-Host ""
-Write-Host "╔════════════════════════════════════════════════╗" -ForegroundColor Green
-Write-Host "  [+] Target: $targetProcess (PID: $pid1) [Admin Context]" -ForegroundColor Green
-Write-Host "  [+] Injecting: delta.dll" -ForegroundColor Green
-Write-Host "╚════════════════════════════════════════════════╝" -ForegroundColor Green
+Write-Host "[+] Target: $targetProcess (PID: $pid1) [Admin Context]" -ForegroundColor Green
+Write-Host "[+] Injecting: delta.dll" -ForegroundColor Green
 Write-Host ""
 
 # === Injection ===
@@ -349,73 +338,70 @@ try {
         (getDelegateType @([IntPtr], [IntPtr], [UInt32], [IntPtr], [IntPtr], [UInt32], [IntPtr]) ([IntPtr]))
     )
     
-    Write-Host "  [+] Opening process handle..." -ForegroundColor Cyan
+    Write-Host "[+] Opening process handle..." -ForegroundColor Cyan
     $hProcess = $OpenProcessDelegate.Invoke(0x001F0FFF, 0, $pid1)
     
     if ($hProcess -eq [IntPtr]::Zero) {
-        Write-Host "  [!] Failed to open process handle. Access Denied?" -ForegroundColor Red
-        Write-Host "  [!] Trying with limited permissions..." -ForegroundColor Yellow
+        Write-Host "[!] Failed to open process handle. Access Denied?" -ForegroundColor Red
+        Write-Host "[!] Trying with limited permissions..." -ForegroundColor Yellow
         $hProcess = $OpenProcessDelegate.Invoke(0x002A, 0, $pid1)
         
         if ($hProcess -eq [IntPtr]::Zero) {
-            Write-Host "  [!] Still failed to open process handle" -ForegroundColor Red
+            Write-Host "[!] Still failed to open process handle" -ForegroundColor Red
             Read-Host "Press Enter to exit"
             exit 1
         }
     }
-    Write-Host "  [+] Process Handle: $hProcess" -ForegroundColor Green
+    Write-Host "[+] Process Handle: $hProcess" -ForegroundColor Green
     
-    Write-Host "  [+] Allocating memory in target process..." -ForegroundColor Cyan
+    Write-Host "[+] Allocating memory in target process..." -ForegroundColor Cyan
     $addr = $VirtualAllocExDelegate.Invoke($hProcess, [IntPtr]::Zero, 0x1000, 0x3000, 0x40)
     if ($addr -eq [IntPtr]::Zero) {
-        Write-Host "  [!] Failed to allocate memory" -ForegroundColor Red
+        Write-Host "[!] Failed to allocate memory" -ForegroundColor Red
         Read-Host "Press Enter to exit"
         exit 1
     }
-    Write-Host "  [+] Allocated Memory: $addr" -ForegroundColor Green
+    Write-Host "[+] Allocated Memory: $addr" -ForegroundColor Green
     
     [Byte[]]$dllNameBytes = [Text.Encoding]::ASCII.GetBytes($dllPath + "`0")
     [IntPtr]$outSize = [IntPtr]::Zero
     
-    Write-Host "  [+] Writing DLL path to target process..." -ForegroundColor Cyan
+    Write-Host "[+] Writing DLL path to target process..." -ForegroundColor Cyan
     $res = $WriteProcessMemoryDelegate.Invoke($hProcess, $addr, $dllNameBytes, $dllNameBytes.Length, $outSize)
     
     if (-not $res) {
-        Write-Host "  [!] Failed to write memory" -ForegroundColor Red
+        Write-Host "[!] Failed to write memory" -ForegroundColor Red
         Read-Host "Press Enter to exit"
         exit 1
     }
-    Write-Host "  [+] Memory Written: $res" -ForegroundColor Green
+    Write-Host "[+] Memory Written: $res" -ForegroundColor Green
     
     $loadLibAddr = LookupFunc kernel32.dll LoadLibraryA
-    Write-Host "  [+] LoadLibraryA Address: $loadLibAddr" -ForegroundColor Green
+    Write-Host "[+] LoadLibraryA Address: $loadLibAddr" -ForegroundColor Green
     
-    Write-Host "  [+] Creating remote thread to load delta.dll..." -ForegroundColor Cyan
+    Write-Host "[+] Creating remote thread to load delta.dll..." -ForegroundColor Cyan
     $hThread = $CreateRemoteThreadDelegate.Invoke($hProcess, [IntPtr]::Zero, 0, $loadLibAddr, $addr, 0, [IntPtr]::Zero)
     
     if ($hThread -ne [IntPtr]::Zero) {
         Write-Host ""
-        Write-Host "╔════════════════════════════════════════════════╗" -ForegroundColor Green
-        Write-Host "║         [✓] INJECTION SUCCESSFUL!              ║" -ForegroundColor Green
-        Write-Host "╠════════════════════════════════════════════════╣" -ForegroundColor Green
-        Write-Host "║  Thread Handle: $hThread" -ForegroundColor Green
-        Write-Host "║  delta.dll loaded into $targetProcess (PID: $pid1)" -ForegroundColor Green
-        Write-Host "║  Delta DLL is now running in target process    ║" -ForegroundColor Green
-        Write-Host "╚════════════════════════════════════════════════╝" -ForegroundColor Green
+        Write-Host "[✓] INJECTION SUCCESSFUL!" -ForegroundColor Green
+        Write-Host "[✓] Thread Handle: $hThread" -ForegroundColor Green
+        Write-Host "[✓] delta.dll loaded into $targetProcess (PID: $pid1)" -ForegroundColor Green
+        Write-Host "[✓] Delta DLL is now running in target process" -ForegroundColor Green
     } else {
         Write-Host ""
-        Write-Host "  [!] Injection failed (CreateRemoteThread returned Zero)" -ForegroundColor Red
-        Write-Host "  [!] Try selecting a different process." -ForegroundColor Yellow
+        Write-Host "[!] Injection failed (CreateRemoteThread returned Zero)" -ForegroundColor Red
+        Write-Host "[!] Try selecting a different process." -ForegroundColor Yellow
     }
 }
 catch {
-    Write-Host "  [!] Error during injection: $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host "[!] Error during injection: $($_.Exception.Message)" -ForegroundColor Red
     Write-Host $_.ScriptStackTrace -ForegroundColor Yellow
 }
 
 # === Enhanced Cleanup & Anti-Forensics ===
 Write-Host ""
-Write-Host "  [+] Starting cleanup..." -ForegroundColor Cyan
+Write-Host "[+] Starting cleanup..." -ForegroundColor Cyan
 
 # Clear PowerShell History
 [Microsoft.PowerShell.PSConsoleReadLine]::ClearHistory() 2>$null
@@ -483,7 +469,7 @@ if ($PSCommandPath -and (Test-Path $PSCommandPath)) {
 [GC]::WaitForPendingFinalizers()
 Start-Sleep -Seconds 2
 
-Write-Host "  [+] Cleanup complete" -ForegroundColor Green
+Write-Host "[+] Cleanup complete" -ForegroundColor Green
 Write-Host ""
 Write-Host "Press Enter to exit..."
 Read-Host
